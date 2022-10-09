@@ -1,1 +1,116 @@
 https://drive.google.com/file/d/1U_h2ZF-1jgi_t8EQnEwEQoW3_cLuvXZb/view?usp=sharing
+def process_jeepingnation(driver):
+    year = '2022'
+    dic = []
+    now = datetime.now()
+
+    driver.get('https://jeepingnation.com/events/')
+
+    while True:
+        try:
+            driver.find_element(By.CLASS_NAME,'mec-load-more-button').click()
+            time.sleep(5)
+        except:
+            break
+
+    articles = driver.find_elements(By.TAG_NAME,'article')
+    for article in articles:
+        event_title = article.find_element(By.CLASS_NAME,'mec-event-title').text.strip()
+        event_link = article.find_element(By.CLASS_NAME,'mec-event-title').find_element(By.TAG_NAME, 'a').get_attribute('href').strip()
+        event_description = article.find_element(By.CLASS_NAME,'mec-event-description').text.strip()
+        try:
+            event_location = article.find_element(By.CLASS_NAME,'mec-venue-details').text.strip()
+        except:
+            event_location = None
+        
+        if event_location is None:
+            print('Skipping this event as location is not available')
+            continue
+
+        event_datetime = article.find_element(By.CLASS_NAME,'mec-event-d').text
+
+        event_date = article.find_element(By.CLASS_NAME,'mec-event-d').text.strip().split(' - ')
+        if len(event_date) > 1:
+            startday = event_date[0].strip()
+            if ' ' in startday:
+                startmonth = startday.split(' ')[1].strip()
+                startday = startday.split(' ')[0].strip()
+                endday = event_date[1].strip()
+                endmonth = endday.split(' ')[1].strip()
+                endday = endday.split(' ')[0].strip()
+            else:
+                endday = event_date[1].strip()
+                endmonth = endday.split(' ')[1].strip()
+                endday = endday.split(' ')[0].strip()
+                startmonth = endmonth
+            
+            start_date = f'{startday}/{startmonth}/{year}'
+            if 'feb' in start_date.lower():
+                start_date = f'{startday}/{startmonth}/{2023}'
+            elif 'mar' in start_date.lower():
+                start_date = f'{startday}/{startmonth}/{2023}'
+            check_start = datetime.strptime(start_date, '%d/%b/%Y')
+            start_date = datetime.strptime(start_date, '%d/%b/%Y').strftime('%d-%b-%y')
+
+            end_date = f'{endday}/{endmonth}/{year}'
+            if 'feb' in end_date.lower():
+                end_date = f'{endday}/{endmonth}/{2023}'
+            elif 'mar' in end_date.lower():
+                end_date = f'{endday}/{endmonth}/{2023}'
+            check_end = datetime.strptime(end_date, '%d/%b/%Y')
+            end_date = datetime.strptime(end_date, '%d/%b/%Y').strftime('%d-%b-%y')
+        else:
+            startmonth = event_datetime.split(' ')[1].strip()
+            startday = event_datetime.split(' ')[0].strip()
+            start_date = f'{startday}/{startmonth}/{year}'
+            if 'Feb' in start_date:
+                start_date = f'{startday}/{startmonth}/{2023}'
+            elif 'Mar' in start_date:
+                start_date = f'{startday}/{startmonth}/{2023}'
+            check_start = datetime.strptime(start_date, '%d/%b/%Y')
+            start_date = datetime.strptime(start_date, '%d/%b/%Y').strftime('%d-%b-%y')
+
+            end_date = ''
+
+        # if check_start > now:
+        #     events_status = 'Pending'
+
+        # if end_date != '':
+        #     if check_end < now:
+        #         events_status = 'Completed'
+
+
+        event_time = article.find_element(By.CLASS_NAME,'mec-time-details').text
+        event_tm = event_time.strip().split(' - ')
+        if len(event_tm) > 1:
+            start_time = event_tm[0].strip()
+            start_time = datetime.strptime(start_time, '%I:%M %p').strftime('%H:%M')
+            end_time = event_tm[1].strip()
+            end_time = datetime.strptime(end_time, '%I:%M %p').strftime('%H:%M')
+        else:
+            if 'ALL DAY' in event_time:
+                start_time = '00:00'
+                end_time = '23:59'
+
+        event_information = {
+            'url': event_link,
+            'post_title':event_title,
+            'post_content':event_description,
+            'events_address':event_location,
+            'startdate':start_date,
+            'enddate':end_date,
+            'starttime':start_time,
+            'endtime':end_time,
+        }
+
+        data = event_information['events_address']
+
+        if collect_zip_city_state(data) is not None:
+            zipcode, city, state, country = collect_zip_city_state(data)
+            d = {'zipcode': zipcode, 'city': city, 'state': state, 'country': country}
+            event_information.update(d)
+        else:
+            print('Skipping this event as location is not available')
+            continue
+
+        store_event_data(event_information)
